@@ -82,4 +82,133 @@ cudaFree(d_c);
 ```
 Free the memory on the device.
 
+### 3. Device Properties
+`cuda_runtime.h` contains some built-in functions to access the device properties: 
+```
+#include <iostream>
+#include <cuda_runtime.h>
 
+int main() {
+    int deviceCount;
+    cudaGetDeviceCount(&deviceCount);
+
+    if (deviceCount == 0) {
+        std::cerr << "No CUDA devices found." << std::endl;
+        return 1;
+    }
+
+    std::cout << "Total CUDA devices found: " << deviceCount << std::endl;
+
+    for (int device = 0; device < deviceCount; ++device) {
+        cudaDeviceProp deviceProp;
+        cudaGetDeviceProperties(&deviceProp, device);
+
+        std::cout << "\nDevice " << device << " (" << deviceProp.name << ") properties:\n";
+        std::cout << "  CUDA version: " << deviceProp.major << "." << deviceProp.minor << std::endl;
+        std::cout << "  Global memory: " << deviceProp.totalGlobalMem / (1024 * 1024) << " MB" << std::endl;
+        std::cout << "  Shared memory per block: " << deviceProp.sharedMemPerBlock / 1024 << " KB" << std::endl;
+        std::cout << "  Warp size: " << deviceProp.warpSize << std::endl;
+        std::cout << "  Max threads per block: " << deviceProp.maxThreadsPerBlock << std::endl;
+        std::cout << "  Max thread dimensions: (" << deviceProp.maxThreadsDim[0] << ", " << deviceProp.maxThreadsDim[1] << ", " << deviceProp.maxThreadsDim[2] << ")" << std::endl;
+        std::cout << "  Max grid dimensions: (" << deviceProp.maxGridSize[0] << ", " << deviceProp.maxGridSize[1] << ", " << deviceProp.maxGridSize[2] << ")" << std::endl;
+        std::cout << "  Number of multiprocessors: " << deviceProp.multiProcessorCount << std::endl;
+        std::cout << "  Clock rate: " << deviceProp.clockRate / 1000 << " MHz" << std::endl;
+        std::cout << "  Total constant memory: " << deviceProp.totalConstMem / 1024 << " KB" << std::endl;
+    }
+
+    return 0;
+}
+```
+Here is the output:
+```
+Total CUDA devices found: 1
+
+Device 0 (NVIDIA GeForce RTX 3080) properties:
+  CUDA version: 8.6
+  Global memory: 10239 MB
+  Shared memory per block: 48 KB
+  Warp size: 32
+  Max threads per block: 1024
+  Max thread dimensions: (1024, 1024, 64)
+  Max grid dimensions: (2147483647, 65535, 65535)
+  Number of multiprocessors: 68
+  Clock rate: 1710 MHz
+  Total constant memory: 64 KB
+```
+
+### 4. Vector Operations
+
+We can parallel across blocks like `gpuAdd << <N, 1 >> >(d_a, d_b, d_c);`
+```
+__global__ void gpuAdd(int *d_a, int *d_b, int *d_c) {
+int tid = blockIdx.x;
+if (tid < N)
+	d_c[tid] = d_a[tid] + d_b[tid];
+}
+```
+
+...or parallelize across threads like `gpuAdd << <1, N >> >(d_a, d_b, d_c);`
+```
+__global__ void gpuAdd(int *d_a, int *d_b, int *d_c) {
+int tid = threadIdx.x;
+if (tid < N)
+	d_c[tid] = d_a[tid] + d_b[tid];
+}
+```
+For large-scale problems, a combination of both blocks and threads (e.g., `gpuAdd <<<M, P>>>(d_a, d_b, d_c);` where `M` and `P` are the number of blocks and threads per block, respectively) is generally used to fully exploit the hierarchical parallelism provided by CUDA.
+
+For small-scale problems or specific optimization purposes, using multiple blocks (first example) can allow for better utilization of the GPU's resources. Different blocks may be scheduled on different multiprocessors, allowing for true parallel execution. It provides more scalability, especially when N is large, as the number of blocks can be much larger than the number of threads per block. On the other hand, using multiple threads in a single block (second example) can be a very efficient way to organize the computation if N is small. However, there is a limitation to the number of threads per block (e.g., 1024 in many GPUs).
+
+### 5. Communication Patterns
+
+Here are some communication patterns, including some that weren't mentioned in the book (thanks, ChatGPT!):
+
+Communication patterns describe how data is exchanged between different computational elements, such as processors, cores, or threads, within a parallel computing environment. Understanding these patterns is crucial for designing efficient parallel algorithms. Here are some common communication patterns along with their typical applications:
+
+1. **Point-to-Point Communication**:
+   - **Description**: Direct communication between two specific processing elements.
+   - **Applications**: Basic data exchanges, client-server communication, and any scenario where precise control of data transfer is needed.
+
+2. **Broadcast**:
+   - **Description**: A single processing element sends the same data to all other processing elements.
+   - **Applications**: Distributing constants or parameters to all processing elements, initializing shared configurations.
+
+3. **Gather**:
+   - **Description**: Collecting data from all processing elements to a single processing element.
+   - **Applications**: Summarizing results, combining partial solutions, or preparing data for output.
+
+4. **Scatter**:
+   - **Description**: Distributing different pieces of data from one processing element to many others.
+   - **Applications**: Allocating tasks or distributing initial data for parallel processing.
+
+5. **Reduce**:
+   - **Description**: Combining data from all processing elements using a specific operation (such as sum, max, etc.) and sending the result to a designated processing element.
+   - **Applications**: Summarizing collective results, such as finding global minima/maxima or calculating the total sum.
+
+6. **All-to-All Communication**:
+   - **Description**: Every processing element sends distinct data to every other processing element.
+   - **Applications**: Global computations where every processing element needs information from every other, such as certain graph algorithms or matrix computations.
+
+7. **Stencil Communication Pattern** (as previously described):
+   - **Description**: Local, neighbor-to-neighbor communication based on a fixed pattern.
+   - **Applications**: Grid-based simulations, image processing, numerical solutions to PDEs.
+
+8. **Pipeline Communication Pattern**:
+   - **Description**: Processing elements are arranged in a linear sequence, and data is passed from one stage to the next.
+   - **Applications**: Sequential processing tasks, such as in signal processing or assembly line simulations.
+
+9. **Ring Communication Pattern**:
+   - **Description**: Similar to the pipeline but connects the ends to form a ring.
+   - **Applications**: Algorithms that require circular data movement, such as certain sorting algorithms.
+
+10. **Mesh and Hypercube Communication Patterns**:
+    - **Description**: Organizing processing elements in multi-dimensional grids or hypercubes, enabling structured communication.
+    - **Applications**: Multi-dimensional scientific simulations, parallel algorithms that benefit from spatial locality.
+
+11. **Map Communication Pattern**:
+   - **Description**: The map pattern applies the same function or operation to each element in a data set, typically in parallel. Each processing element is responsible for performing the operation on a subset of the data.
+   - **Applications**: This pattern is widely used in data parallelism, where the same operation needs to be performed on each data element independently. Examples include applying a filter to an image, parallel array addition, or any operation that can be performed independently on individual data elements.
+
+12. **Transpose Communication Pattern**:
+   - **Description**: In the transpose pattern, data is rearranged according to a specific rule, often involving a reordering of dimensions in a multi-dimensional array. This pattern often corresponds to a matrix transpose, where rows become columns and vice versa, but can also be more generally applied to other data transformations.
+   - **Applications**: The transpose pattern is common in scientific computing and numerical algorithms that require a change in data layout for efficiency. This includes certain matrix multiplication algorithms, Fast Fourier Transforms (FFTs), and rearranging data to optimize cache usage.

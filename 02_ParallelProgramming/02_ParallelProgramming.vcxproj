@@ -12,6 +12,8 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="01_variable_addition_value.cu" />
+    <CudaCompile Include="04_device_properties.cu" />
+    <CudaCompile Include="05_vector_addition_gpu.cu" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />
