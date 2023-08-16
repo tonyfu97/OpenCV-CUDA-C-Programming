@@ -14,7 +14,7 @@
     <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="008_gpu_texture_memory.cu" />
+    <CudaCompile Include="010_gpu_matmul.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{A3CD4C9E-C7D6-40C3-9D37-2F7F044B36F0}</ProjectGuid>

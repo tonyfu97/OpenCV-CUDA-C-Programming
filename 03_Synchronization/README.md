@@ -247,9 +247,115 @@ CUDA texture objects replaced CUDA texture references starting with the CUDA SDK
    free(h_out);
    cudaFree(d_in);
    cudaFree(d_out);
-   cudaDestroyTextureObject(textureObj
-
-);
+   cudaDestroyTextureObject(textureObj);
    ```
    Don't forget to free all allocated memory and destroy the texture object.
 
+### 6. Dot Product
+
+Take a look at [`009_dot_product.cu`](009_dot_product.cu), where you'll find this kernel function:
+
+```cpp
+__global__ void gpu_dot(float* d_a, float* d_b, float* d_c)
+{
+	__shared__ float partial_sum[THREADS_PER_BLOCK];
+	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+	int index = threadIdx.x;
+
+	// Compute element-wise dot product
+	float sum = 0;
+	while (tid < N)
+	{
+		sum += d_a[tid] * d_b[tid];
+		tid += blockDim.x * gridDim.x;
+	}
+
+	partial_sum[index] = sum;
+
+	__syncthreads();
+
+	// Reduction
+	int i = blockDim.x / 2;
+	while (i != 0)
+	{
+		if (index < i)
+		{
+			partial_sum[index] += partial_sum[index + i];
+		}
+		__syncthreads();
+		i >>= 1;
+	}
+
+	if (index == 0)
+	{
+		d_c[blockIdx.x] = partial_sum[0];
+	}
+}
+```
+
+Here, the `partial_sum` array is a shared memory within each block, used to store the element-wise multiplication of the `d_a` and `d_b` arrays stored in global memory. This shared memory can enable faster access due to its closeness to the processor and may leverage spatial locality (where adjacent threads access adjacent data), though whether it will be cached depends on the specific GPU architecture.
+
+Next, a reduction operation takes place to combine the products in pairs in a binary-search-like fashion until the whole `partial_sum` array has been reduced to a single sum at index 0. This block-wise partial sum is then assigned to `d_c`.
+
+The author of the code has chosen to move the final summation to the host rather than using atomic addition on the GPU. While atomic addition would provide a way to sum all elements in `d_c` to get the final sum, it could lead to contention and thus might be slower than summing the partial results on the CPU. See the following host code for how the final summation is carried out:
+
+```cpp
+int main()
+{
+	// Initialization code (not shown)
+
+	partial_sum = (float*)malloc(blocks_per_grid * sizeof(float));
+	cudaMalloc((void**)&d_partial_sum, blocks_per_grid * sizeof(float));
+
+	gpu_dot << <blocks_per_grid, THREADS_PER_BLOCK >> > (d_a, d_b, d_partial_sum);
+
+	cudaMemcpy(partial_sum, d_partial_sum, blocks_per_grid * sizeof(float), cudaMemcpyDeviceToHost);
+
+	// Calculate final dot product on host
+	h_c = 0;
+	for (int i = 0; i < blocks_per_grid; i++) {
+		h_c += partial_sum[i];
+	}
+	
+	// Rest of the code...
+}
+```
+
+### 7. Matrix Multiplication
+
+Let's consider the multiplication of two 4 x 4 matrices. If we just use global memory, each number in either matrix would need to be accessed exactly 4 times in the process, leading to a significant amount of traffic to global memory. This presents an opportunity to optimize performance by taking advantage of shared memory.
+
+Here's an example code in [`010_gpu_matmul.cu`](010_gpu_matmul.cu] that demonstrates this approach:
+
+```cpp
+#define TILE_SIZE 2
+const int size = 4;
+
+__global__ void gpu_matmul_shared(float* d_a, float* d_b, float* d_c, const int size)
+{
+	__shared__ float shared_a[TILE_SIZE][TILE_SIZE];
+	__shared__ float shared_b[TILE_SIZE][TILE_SIZE];
+
+	int col = TILE_SIZE * blockIdx.x + threadIdx.x;
+	int row = TILE_SIZE * blockIdx.y + threadIdx.y;
+
+	for (int i = 0; i < size / TILE_SIZE; i++)
+	{
+		shared_a[threadIdx.y][threadIdx.x] = d_a[row * size + (i * TILE_SIZE + threadIdx.x)];
+		shared_b[threadIdx.y][threadIdx.x] = d_b[(i * TILE_SIZE + threadIdx.y) * size + col];
+
+		__syncthreads();
+
+		for (int j = 0; j < TILE_SIZE; j++)
+		{
+			d_c[row * size + col] += shared_a[threadIdx.y][j] * shared_b[j][threadIdx.x];
+		}
+		__syncthreads();
+	}
+}
+```
+
+In this code, we're dividing the resulting 4 x 4 matrix into four 2 x 2 (TILE_SIZE x TILE_SIZE) sub-matrices, with each residing in a separate block. The `col` and `row` indices are calculated to figure out what column and row the current thread corresponds to in the final 4 x 4 matrix.
+
+Unlike other arrays in this code, `d_a` and `d_b` are 1D arrays that represent 2D data in row-major order. Each block copies a 2 x 2 submatrix to `shared_a` and `shared_b`. The inner for-loop then takes advantage of shared memory, as each thread performs a mini matrix multiplication between the two sub-matrices in `shared_a` and `shared_b`, without having to query the matrix values multiple times from global memory. The process then repeats for other pairs of sub-matrices.
