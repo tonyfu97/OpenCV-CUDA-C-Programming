@@ -14,7 +14,7 @@
     <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="001_cuda_events.cu" />
+    <CudaCompile Include="003_streams.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{D6A665B5-6F69-4216-ADA8-C86DCCEB1379}</ProjectGuid>
