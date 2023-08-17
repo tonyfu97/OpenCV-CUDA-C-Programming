@@ -158,7 +158,6 @@ CUDA texture objects replaced CUDA texture references starting with the CUDA SDK
 
 1. **Include Statements and Macro Definitions**:
    ```cpp
-   #include <iostream>
    #include <cuda_runtime.h>
 
    #define NUM_THREADS 10
@@ -326,7 +325,7 @@ int main()
 
 Let's consider the multiplication of two 4 x 4 matrices. If we just use global memory, each number in either matrix would need to be accessed exactly 4 times in the process, leading to a significant amount of traffic to global memory. This presents an opportunity to optimize performance by taking advantage of shared memory.
 
-Here's an example code in [`010_gpu_matmul.cu`](010_gpu_matmul.cu] that demonstrates this approach:
+Here's an example code in [`010_gpu_matmul.cu`](010_gpu_matmul.cu) that demonstrates this approach:
 
 ```cpp
 #define TILE_SIZE 2

@@ -123,7 +123,73 @@ By wrapping GPU-related code with CUDA events, precise timing measurements can b
 - **Multiples of Warp Size**: Choose thread blocks with sizes that are multiples of the warp size (typically 32 for NVIDIA GPUs) to ensure that there are no idle threads within a warp.
 - **Balance and Experiment**: Start with common sizes like 128 or 256 threads per block, but experiment and profile to find the best balance between parallelism and the kernel's resource requirements.
 
+
 ### 5. CUDA Streams
 
+Until now, we have launched only one kernel on the device at a time. What happens if we want to launch multiple kernels simultaneously? We can't use `cudaMemcpy()` for this purpose, as it's a "blocking" operation on the CPU. Instead, we need to create CUDA streams to launch separate kernels concurrently. This requires the use of asynchronous operations such as `cudaMemcpyAsync()` to copy memory, along with other asynchronous functions for CPU-centered tasks. But how can we ensure that the memory is properly copied before the kernel is launched? This leads us to the concept of CUDA streams.
 
+CUDA streams are sequences of commands (including memory transfers, kernel launches, etc.) that execute in a specified order on the GPU. By default, all executions are done within the default stream (with index 0). However, creating separate streams allows different sequences to execute concurrently. Here's how you can create a stream:
 
+```cpp
+cudaStream_t stream0;
+cudaStreamCreate(&stream0);
+```
+
+Don't forget to delete the stream at the end of the program:
+
+```cpp
+cudaStreamDestroy(stream0);
+```
+
+Though CUDA streams execute in order, there may still be times when we'd like to wait for them to complete. We can use `cudaStreamSynchronize(stream)` to wait for a specific stream to complete all its operations. Alternatively, we can call `cudaDeviceSynchronize()` to wait for all streams to complete. It's worth noting that using both at the same time, as seen in the example `03_cuda_stream.cu` from the book, is redundant.
+
+### 6. Paralellized Sorting
+
+Unlike the previous operations we seen, which are mainly map (one-to-one), transpose (one-to-one), scatter (one-to-many), gather (many to one), stencil(specialized gather, also many-to-one), reduce (all-to-one), operations, sorting is an all-to-all operations. 
+
+Here's a table that summarizes some common sorting algorithms:
+
+| Algorithm      | Space Complexity | Time Complexity      | GPU Acceleratable | Description                                                                                     |
+|----------------|------------------|----------------------|-------------------|-------------------------------------------------------------------------------------------------|
+| Quick Sort     | \(O(\log n)\)         | \(O(n \log n)\) (average) | Yes             | Partitions the array and recursively sorts the partitions.                                      |
+| Merge Sort     | \(O(n)\)              | \(O(n \log n)\)         | Yes             | Recursively divides the array and then merges the sorted partitions.                             |
+| Bubble Sort    | \(O(1)\)              | \(O(n^2)\)              | No              | Repeatedly swaps adjacent elements if they are in the wrong order.                               |
+| Insertion Sort | \(O(1)\)              | \(O(n^2)\)              | No              | Builds a sorted array one element at a time.                                                     |
+| Heap Sort      | \(O(1)\)              | \(O(n \log n)\)         | Yes             | Uses a binary heap to sort the elements.                                                         |
+| Radix Sort     | \(O(nk)\)             | \(O(nk)\)               | Yes             | Sorts integers by processing individual digits.                                                  |
+| Selection Sort | \(O(1)\)              | \(O(n^2)\)              | No              | Selects the minimum/maximum element and places it at the beginning/end of the list.               |
+| Rank Sort      | \(O(n)\)              | \(O(n^2)\) to \(O(n \log n)\) depending on implementation | Yes, see example       | Determines the rank of each element and places it in the corresponding position in the sorted list. |
+
+The book implements rank sort in [`004_rank_sort.cu`](004_rank_sort.cu). Here's how it's done:
+
+```cpp
+__global__ void addKernel(int* d_a, int* d_b)
+{
+	int count = 0;
+	int tid = threadIdx.x;
+	int ttid = blockIdx.x * THREAD_PER_BLOCK + tid;
+	int val = d_a[ttid];
+
+	__shared__ int cache[THREAD_PER_BLOCK];
+	for (int i = tid; i < ARRAY_SIZE; i+=THREAD_PER_BLOCK)
+	{
+		cache[tid] = d_a[i];
+		__syncthreads();
+		for (int j = 0; j < THREAD_PER_BLOCK; j++)
+		{
+			if (val > cache[j])
+			{
+				count++;
+			}
+			__syncthreads();
+		}
+	}
+	d_b[count] = val;
+}
+```
+
+ The code is attempting to determine the rank of each element in the array by counting how many numbers are less than it. This rank is then used to place the number in the corresponding position in the output array.
+
+However, the author's code here did not account for repeating numbers with the same value, they will have the same rank, and the code will attempt to place them in the same position in the output array (`d_b`). This leads to a race condition where the last thread to write to that position will overwrite any previous writes. The result is undefined behavior, and some of the repeating numbers will be lost.
+
+### 7. 

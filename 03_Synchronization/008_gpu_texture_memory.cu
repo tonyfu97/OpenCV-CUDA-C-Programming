@@ -1,4 +1,4 @@
-#include <iostream>
+#include <stdio.h>
 #include <cuda_runtime.h>
 
 #define NUM_THREADS 10

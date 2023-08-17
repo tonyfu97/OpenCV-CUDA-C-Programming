@@ -1,6 +1,6 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
-#include <iostream>
+#include <stdio.h>
 
 #define N 50000
 
@@ -59,8 +59,6 @@ int main()
 	cudaMemcpyAsync(h_c + N, d_c1, N * sizeof(int), cudaMemcpyDeviceToHost, stream0);
 
 	cudaDeviceSynchronize();
-	cudaStreamSynchronize(stream0);
-	cudaStreamSynchronize(stream1);
 	cudaEventRecord(e_stop, 0);
 	cudaEventSynchronize(e_stop);
 	float elapsedTime;
@@ -87,11 +85,13 @@ int main()
 	cudaFree(d_a0);
 	cudaFree(d_b0);
 	cudaFree(d_c0);
-	cudaFree(d_a0);
-	cudaFree(d_b0);
-	cudaFree(d_c0);
+	cudaFree(d_a1);
+	cudaFree(d_b1);
+	cudaFree(d_c1);
 	cudaFreeHost(h_a);
 	cudaFreeHost(h_b);
 	cudaFreeHost(h_c);
+	cudaStreamDestroy(stream0);
+	cudaStreamDestroy(stream1);
 	return 0;
 }

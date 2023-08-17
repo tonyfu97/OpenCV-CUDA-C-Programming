@@ -206,9 +206,9 @@ Communication patterns describe how data is exchanged between different computat
     - **Applications**: Multi-dimensional scientific simulations, parallel algorithms that benefit from spatial locality.
 
 11. **Map Communication Pattern**:
-   - **Description**: The map pattern applies the same function or operation to each element in a data set, typically in parallel. Each processing element is responsible for performing the operation on a subset of the data.
-   - **Applications**: This pattern is widely used in data parallelism, where the same operation needs to be performed on each data element independently. Examples include applying a filter to an image, parallel array addition, or any operation that can be performed independently on individual data elements.
+    - **Description**: The map pattern applies the same function or operation to each element in a data set, typically in parallel. Each processing element is responsible for performing the operation on a subset of the data.
+    - **Applications**: This pattern is widely used in data parallelism, where the same operation needs to be performed on each data element independently. Examples include applying a filter to an image, parallel array addition, or any operation that can be performed independently on individual data elements.
 
 12. **Transpose Communication Pattern**:
-   - **Description**: In the transpose pattern, data is rearranged according to a specific rule, often involving a reordering of dimensions in a multi-dimensional array. This pattern often corresponds to a matrix transpose, where rows become columns and vice versa, but can also be more generally applied to other data transformations.
-   - **Applications**: The transpose pattern is common in scientific computing and numerical algorithms that require a change in data layout for efficiency. This includes certain matrix multiplication algorithms, Fast Fourier Transforms (FFTs), and rearranging data to optimize cache usage.
+    - **Description**: In the transpose pattern, data is rearranged according to a specific rule, often involving a reordering of dimensions in a multi-dimensional array. This pattern often corresponds to a matrix transpose, where rows become columns and vice versa, but can also be more generally applied to other data transformations.
+    - **Applications**: The transpose pattern is common in scientific computing and numerical algorithms that require a change in data layout for efficiency. This includes certain matrix multiplication algorithms, Fast Fourier Transforms (FFTs), and rearranging data to optimize cache usage.

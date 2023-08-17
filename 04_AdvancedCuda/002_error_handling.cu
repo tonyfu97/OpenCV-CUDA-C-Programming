@@ -1,6 +1,6 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
-#include <iostream>
+#include <stdio.h>
 
 __global__ void gpuAdd(int* d_a, int* d_b, int* d_c)
 {

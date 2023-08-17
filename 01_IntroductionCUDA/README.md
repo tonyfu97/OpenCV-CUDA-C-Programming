@@ -29,8 +29,6 @@
 Below is the simple CUDA code example from the book:
 
 ```cpp
-#include <iostream>
-
 #include <stdio.h>
 __global__ void myfirstkernel(void) {
 }

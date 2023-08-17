@@ -1,5 +1,5 @@
 #include <cuda_runtime.h>
-#include <iostream>
+#include <stdio.h>
 #include <chrono>
 
 #define N 1000000
