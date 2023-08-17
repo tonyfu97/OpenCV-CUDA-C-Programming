@@ -191,5 +191,3 @@ __global__ void addKernel(int* d_a, int* d_b)
  The code is attempting to determine the rank of each element in the array by counting how many numbers are less than it. This rank is then used to place the number in the corresponding position in the output array.
 
 However, the author's code here did not account for repeating numbers with the same value, they will have the same rank, and the code will attempt to place them in the same position in the output array (`d_b`). This leads to a race condition where the last thread to write to that position will overwrite any previous writes. The result is undefined behavior, and some of the repeating numbers will be lost.
-
-### 7. 
