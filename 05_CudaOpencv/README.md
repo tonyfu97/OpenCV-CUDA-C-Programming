@@ -8,9 +8,9 @@
 
 ## Core Concepts
 
-Certainly! Here's the revised text:
+## Issue with OpenCV
 
-### Issue with OpenCV
+**Warning**: I encounted a build issue with OpenCV.
 
 While attempting to build the project, I encountered the following error:
 ```
